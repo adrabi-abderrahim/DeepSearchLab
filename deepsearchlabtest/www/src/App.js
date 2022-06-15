@@ -8,24 +8,34 @@ import Container from 'react-bootstrap/Container';
 import GenerationZ from './components/GenerationZ/GenerationZ.lazy';
 import YoungPeople from './components/YoungPeople/YoungPeople.lazy';
 
-function App() {
-  return (
-    <>
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+
+    // Since this is just a demo will not use routers.
+    this.state = {
+      firstLink: true
+    };
+  }
+
+  render() {
+    return (<>
       <NavBar bg='light' expand='lg'>
         <Container fluid>
-          <NavBar.Brand href='#generation-z'>
+          <NavBar.Brand>
             DeepSearch Labs
           </NavBar.Brand>
           <NavBar.Toggle aria-controls="basic-navbar-nav" />
           <NavBar.Collapse>
-            <Nav.Link href="#generation-z">Generation Z</Nav.Link>
-            <Nav.Link href="#young-people">Young People</Nav.Link>
+            <Nav.Link onClick={() => this.setState({firstLink: true})} >Generation Z</Nav.Link>
+            <Nav.Link onClick={() => this.setState({firstLink: false})}>Young People</Nav.Link>
           </NavBar.Collapse>
         </Container>
       </NavBar>
-      <GenerationZ></GenerationZ>
-    </>
-  );
+      {
+        this.state.firstLink ? <GenerationZ></GenerationZ> : <YoungPeople></YoungPeople>
+      }
+    </>)
+  }
 }
-
 export default App;

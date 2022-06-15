@@ -5,6 +5,7 @@ import styles from './KnowledgeGraph.module.css';
 import * as d3 from 'd3';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/esm/Col';
+import _ from 'lodash';
 
 
 class KnowledgeGraph extends React.Component {
@@ -15,19 +16,33 @@ class KnowledgeGraph extends React.Component {
     super(props);
   }
 
-  drawGraph(graph = { vertices: [], edges: [] }, width = 800) {
-    const height = Math.min(width, width * 0.6);
-    const svg = d3.select(this.currentRef.current);
-    svg.attr("viewBox", [0, 0, width, height]);
 
-    const edge = svg
+  drawGraph() {
+    if (!this.props.graph[0]) return;
+
+    const graph = this.props.graph[0]['graph'];
+
+    const width = this.props.width;
+    const height = Math.min(width, width * 0.6);
+
+    const svg = d3.select(this.currentRef.current);
+    svg.selectAll('*').remove();
+
+    svg
+      .attr("viewBox", [0, 0, width, height])
+      .style("cursor", "crosshair")
+      .call(d3.zoom().on("zoom", e => g.attr("transform", e.transform)));
+
+    const g = svg.append('g');
+
+    const edge = g
       .selectAll(".link")
       .data(graph.edges)
       .join("line");
 
     edge.attr("stroke-width", (d) => Math.sqrt(d.value));
 
-    const vertex = svg
+    const vertex = g
       .selectAll(".node")
       .data(graph.vertices)
       .join("g")
@@ -50,17 +65,23 @@ class KnowledgeGraph extends React.Component {
       );
 
     vertex.append("circle")
-      .attr("r", (d) => 20 * d.ratio)
-      .attr("fill", (d) => d.color);
+      .attr("r", (d) => Math.sqrt(d.total))
+      .attr("fill", (d) => d.positive >= d.negative ? 'green' : 'red')
+      .style("cursor", "pointer")
+      .on('click', function (e, d) {
+        if (this.props.onShowWordDetails) {
+          this.props.onShowWordDetails(d);
+        }
+      }.bind(this));
 
     var lables = vertex.append("text")
-      .text((d) => d.id)
-      .attr('x', (d) => 10 + (20 * d.ratio) / 2)
+      .text((d) => d.word)
+      .attr('x', (d) => 10)
       .attr('y', 3);
 
     var simulation = d3
       .forceSimulation()
-      .force("link", d3.forceLink().id((d) => d.id).distance(100))
+      .force("link", d3.forceLink().id((d) => d.id).distance(300))
       .force("charge", d3.forceManyBody())
       .force("center", d3.forceCenter(width / 2, height / 2));
 
@@ -77,39 +98,26 @@ class KnowledgeGraph extends React.Component {
         .attr("y1", d => d.source.y)
         .attr("x2", d => d.target.x)
         .attr("y2", d => d.target.y)
-        .attr("stroke", "#ccc")
-        .attr("stroke-width", "0.5px");
+        .attr("stroke", d => d.sentence_sentiment_label ? 'green' : 'red')
+        .attr("stroke-width", d => 2 * d.sentence_sentiment_net);
 
       vertex.attr("transform", (d) => `translate(${d.x}, ${d.y})`);
     }
+
+
   }
 
-  componentDidMount() {
-
-    const width = 800;
-    const graph = {
-      "vertices": [
-        { "id": "Myriel", "group": 1, "color": "red", "ratio": 0.5 },
-        { "id": "Napoleon", "group": 1, "color": "blue", "ratio": 0.7 },
-        { "id": "Mlle.Baptistine", "group": 1, "color": "green", "ratio": 1 },
-        { "id": "Mme.Magloire", "group": 1, "color": "#aaa", "ratio": 0.2 },
-
-      ],
-      "edges": [
-        { "source": "Napoleon", "target": "Myriel", "value": 1 },
-        { "source": "Mlle.Baptistine", "target": "Myriel", "value": 8 },
-        { "source": "Mme.Magloire", "target": "Myriel", "value": 10 },
-        { "source": "Mme.Magloire", "target": "Mlle.Baptistine", "value": 6 },
-
-      ]
-    };
-    this.drawGraph(graph, width);
+  componentDidUpdate(prevProps) {
+    if (!_.isEqual(prevProps.graph, this.props.graph)) {
+      this.drawGraph();
+    }
   }
 
   render() {
+
     return <Row>
       <Col className={`${styles.GraphZone} w-100 col`}>
-        <svg className={`h-100 w-100`}  ref={this.currentRef}></svg>
+        <svg className={`h-100 w-100`} ref={this.currentRef}></svg>
       </Col>
     </Row>
   }

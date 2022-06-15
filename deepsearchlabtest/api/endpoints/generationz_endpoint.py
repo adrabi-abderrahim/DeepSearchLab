@@ -2,6 +2,9 @@ from datetime import date
 from typing import List
 from django.db.models import Q
 from api.models.generationz import GenerationZ
+from neo4j import GraphDatabase
+from django.conf import settings
+
 
 '''
 Generation Z endpoint that contains all API endpoints.
@@ -56,3 +59,90 @@ def post_generationz_search(request=None, dates:List[date]=None, categories:List
         return GenerationZ.objects.filter(query)
     else:
         return {}
+
+
+def query_transaction(tx, q, **kwargs):
+    return tx.run(q, kwargs).data()
+
+def query(q, **kwargs):
+    with GraphDatabase.driver(settings.NEO4J_URL, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)) as driver:
+        with driver.session() as session:
+            return session.read_transaction(query_transaction, q, **kwargs)
+
+
+
+def get_graph_categories(request=None):
+    """
+    Returns the list of categories in graph database.
+    """
+
+    results = query(
+        '''
+        match (n)
+        with distinct n.categories as categories
+        with collect(categories) as categories
+        WITH REDUCE(output = [], c IN categories| output + c) AS flat
+        return flat as categories
+        '''
+    )
+    if results:
+        return { "categories": sorted(list(set(results[0]['categories'])))}
+    return {}
+
+def get_graph_filter(request=None, word=None, category=None):
+    """
+    Return nodes with their relations that have the specified word.
+    """
+    if not word and not category:
+        return {}
+
+    u_where_clause = []
+    v_where_clause = []
+    params  = {}
+    if word:
+        u_where_clause.append(' u.word = $word ')
+        v_where_clause.append(' v.word = $word ')
+        params['word'] = word.capitalize()
+
+    if category:
+        u_where_clause.append(' $category in u.categories  ')
+        v_where_clause.append(' $category in v.categories  ')
+        params['category'] = category.capitalize()
+
+    u_where_clause = ' and '.join(u_where_clause)
+    v_where_clause = ' and '.join(v_where_clause)
+
+    return query(
+        f'''
+        match (u:Keyword)-[e:In_Sentence]-(v:Keyword)
+        where ({u_where_clause}) or ({v_where_clause})
+        with collect(
+        DISTINCT
+        {{
+            id: id(u),
+            total: u.total,
+            positive: u.positive,
+            negative: u.negative,
+            categories: u.categories,
+            mean_positive: u.mean_positive,
+            mean_negative: u.mean_negative,
+            word: u.word
+        }}) as vertices,
+        collect(
+            distinct
+            {{
+                id: id(e),
+                source: id(startNode(e)),
+                target: id(endNode(e)),
+                type: type(e),
+                sentence_sentiment_label: e.sentence_sentiment_label,
+                sentence_sentiment_net: e.sentence_sentiment_net,
+                sentence_sent_score: e.sentence_sent_score,
+                categories: e.categories
+            }}
+        ) as edges
+    
+        return {{vertices: vertices, edges: edges}}  as graph   
+        ''',
+        **params
+    )

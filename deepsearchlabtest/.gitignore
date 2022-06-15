@@ -3,7 +3,7 @@
 *.pot
 *.pyc
 __pycache__
-db.sqlite3
+#db.sqlite3
 media
 
 # Backup files # 
@@ -157,3 +157,6 @@ GitHub.sublime-settings
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+
+**/management

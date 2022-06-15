@@ -1,4 +1,3 @@
-from unicodedata import category
 from django.core.management.base import BaseCommand, CommandError
 from api.models.generationz import GenerationZ
 import os
